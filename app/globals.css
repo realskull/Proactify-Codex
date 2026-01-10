@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------
+   LIGHT THEME (DEFAULT)
+--------------------------------------------------------- */
+@theme {
+  /* Base */
+  --color-bg: #f5f7fa;
+  --color-text: #29333b;
+  --color-border: #e6eff5;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-alt: #f9fafb;
+
+  /* Accents */
+  --color-orange: #ffce51;
+  --color-red: #ff7324;
+  --color-blue: #2563eb;
+
+  /* Warning System */
+  --color-warning: #f3654a;
+  --color-warning-bg: #fde0db;
+  --color-warning-border: #fac1b7;
+
+  /* Grays + Metal Colors (Used in Leaderboard Podiums) */
+  --color-light-gray: #edeff1;
+  --color-gold: #ffc300;
+  --color-silver: #cccccc;
+  --color-bronze: #fba069;
+
+  --color-toggle: #555cf3;
+  --color-toggle-bg: #dddefd;
+  --color-toggle-border: #bbbefa;
+}
+
+/* ---------------------------------------------------------
+   DARK THEME
+--------------------------------------------------------- */
+:root.dark {
+  /* Base */
+  --color-bg: #0f0f0f;
+  --color-text: #e6e6e6;
+  --color-border: #2a2a2a;
+
+  /* Surfaces */
+  --color-surface: #1a1a1a;
+  --color-surface-alt: #111111;
+
+  /* Warning overrides */
+  --color-warning-bg: #5a1f1f;
+  --color-warning-border: #7a2c2c;
+
+  /* Accent overrides (chart line, etc.) */
+  --color-blue: #3b82f6;
+
+  /* Neutral gray for streak bubbles + neutral UI */
+  --color-light-gray: #2a2a2a;
+
+  --color-toggle: #f2c75a;
+  --color-toggle-bg: #7c5a22;
+  --color-toggle-border: #b98a38;
+}
