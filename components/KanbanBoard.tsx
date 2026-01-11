@@ -2,27 +2,18 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  BadgeCheck,
-  Crown,
-  Flame,
-  Plus,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { ChevronDown, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import {
   closestCorners,
   DndContext,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -46,6 +37,12 @@ const tagOptions = [
   "People",
 ];
 
+type ChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
 type Task = {
   id: string;
   title: string;
@@ -53,6 +50,9 @@ type Task = {
   tag: string;
   due: string;
   assignees: string[];
+  checklist: ChecklistItem[];
+  progress: number;
+  deadline: string;
 };
 
 type Column = {
@@ -86,6 +86,13 @@ const initialColumns: Column[] = [
         tag: "Research",
         due: "Mon",
         assignees: ["AR", "KD"],
+        checklist: [
+          { id: "task-1-check-1", label: "Draft personas", done: true },
+          { id: "task-1-check-2", label: "Capture pain points", done: false },
+          { id: "task-1-check-3", label: "Share summary", done: false },
+        ],
+        progress: 40,
+        deadline: "2026-02-12",
       },
       {
         id: "task-2",
@@ -94,6 +101,13 @@ const initialColumns: Column[] = [
         tag: "Strategy",
         due: "Tue",
         assignees: ["LW"],
+        checklist: [
+          { id: "task-2-check-1", label: "Pricing matrix", done: true },
+          { id: "task-2-check-2", label: "Feature gaps", done: true },
+          { id: "task-2-check-3", label: "Recommendation", done: false },
+        ],
+        progress: 65,
+        deadline: "2026-02-14",
       },
     ],
   },
@@ -109,6 +123,12 @@ const initialColumns: Column[] = [
         tag: "Design",
         due: "Today",
         assignees: ["MP", "AR"],
+        checklist: [
+          { id: "task-3-check-1", label: "Spacing inventory", done: true },
+          { id: "task-3-check-2", label: "Color tokens", done: false },
+        ],
+        progress: 55,
+        deadline: "2026-02-10",
       },
       {
         id: "task-4",
@@ -117,6 +137,12 @@ const initialColumns: Column[] = [
         tag: "Content",
         due: "Wed",
         assignees: ["KD"],
+        checklist: [
+          { id: "task-4-check-1", label: "Email draft", done: true },
+          { id: "task-4-check-2", label: "In-app copy", done: false },
+        ],
+        progress: 35,
+        deadline: "2026-02-18",
       },
       {
         id: "task-5",
@@ -125,6 +151,13 @@ const initialColumns: Column[] = [
         tag: "Ops",
         due: "Thu",
         assignees: ["LW"],
+        checklist: [
+          { id: "task-5-check-1", label: "Capacity review", done: true },
+          { id: "task-5-check-2", label: "Goal setting", done: false },
+          { id: "task-5-check-3", label: "Assign owners", done: false },
+        ],
+        progress: 20,
+        deadline: "2026-02-16",
       },
     ],
   },
@@ -140,6 +173,12 @@ const initialColumns: Column[] = [
         tag: "Product",
         due: "Fri",
         assignees: ["MP", "JB"],
+        checklist: [
+          { id: "task-6-check-1", label: "Record demo", done: true },
+          { id: "task-6-check-2", label: "Collect notes", done: false },
+        ],
+        progress: 70,
+        deadline: "2026-02-11",
       },
       {
         id: "task-7",
@@ -148,6 +187,12 @@ const initialColumns: Column[] = [
         tag: "Data",
         due: "Fri",
         assignees: ["AR"],
+        checklist: [
+          { id: "task-7-check-1", label: "Review metrics", done: true },
+          { id: "task-7-check-2", label: "Confirm owners", done: false },
+        ],
+        progress: 50,
+        deadline: "2026-02-15",
       },
     ],
   },
@@ -163,6 +208,12 @@ const initialColumns: Column[] = [
         tag: "People",
         due: "Done",
         assignees: ["JB"],
+        checklist: [
+          { id: "task-8-check-1", label: "Stakeholders aligned", done: true },
+          { id: "task-8-check-2", label: "Schedule published", done: true },
+        ],
+        progress: 100,
+        deadline: "2026-02-05",
       },
       {
         id: "task-9",
@@ -171,33 +222,17 @@ const initialColumns: Column[] = [
         tag: "Ops",
         due: "Done",
         assignees: ["LW"],
+        checklist: [
+          { id: "task-9-check-1", label: "Archive cleanup", done: true },
+          { id: "task-9-check-2", label: "Access review", done: true },
+        ],
+        progress: 100,
+        deadline: "2026-02-02",
       },
     ],
   },
 ];
 
-const badgeData = [
-  {
-    title: "Consistency Champion",
-    description: "14-day streak",
-    icon: Flame,
-  },
-  {
-    title: "Night Owl",
-    description: "10pm - 5am sessions",
-    icon: Sparkles,
-  },
-  {
-    title: "Task Crusher",
-    description: "100% tasks done",
-    icon: BadgeCheck,
-  },
-  {
-    title: "Level 12",
-    description: "XP 8,450",
-    icon: Crown,
-  },
-];
 
 function buildTaskAssignees(value: string) {
   return value
@@ -215,13 +250,25 @@ function getColumnByTaskId(columns: Column[], taskId: string) {
 function TaskCard({
   task,
   columnId,
-  onMove,
-  onDelete,
+  isExpanded,
+  checklistDraft,
+  onToggleExpanded,
+  onChecklistToggle,
+  onChecklistAdd,
+  onChecklistDraftChange,
+  onProgressChange,
+  onDeadlineChange,
 }: {
   task: Task;
   columnId: string;
-  onMove: (taskId: string, direction: "left" | "right") => void;
-  onDelete: (taskId: string) => void;
+  isExpanded: boolean;
+  checklistDraft: string;
+  onToggleExpanded: () => void;
+  onChecklistToggle: (taskId: string, itemId: string) => void;
+  onChecklistAdd: (taskId: string) => void;
+  onChecklistDraftChange: (taskId: string, value: string) => void;
+  onProgressChange: (taskId: string, value: number) => void;
+  onDeadlineChange: (taskId: string, value: string) => void;
 }) {
   const {
     attributes,
@@ -247,15 +294,24 @@ function TaskCard({
       className={`flex flex-col gap-4 rounded-2xl border border-border bg-bg p-4 shadow-sm transition-shadow ${
         isDragging ? "opacity-50 shadow-lg" : "hover:shadow-md"
       }`}
+      {...attributes}
+      {...listeners}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-text">{task.title}</p>
           <p className="mt-2 text-sm text-text-muted">{task.description}</p>
         </div>
-        <span className="rounded-full bg-surface-alt px-2 py-1 text-xs font-medium text-text">
-          {task.due}
-        </span>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleExpanded();
+          }}
+          className="rounded-full border border-border p-2 text-text-muted transition hover:border-text"
+        >
+          <MoreHorizontal size={16} />
+        </button>
       </div>
       <div className="flex items-center justify-between">
         <span className="rounded-full border border-border bg-surface-alt px-3 py-1 text-xs font-semibold text-text">
@@ -272,37 +328,69 @@ function TaskCard({
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onMove(task.id, "left")}
-          className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-text transition hover:border-text"
+      {isExpanded ? (
+        <div
+          className="rounded-xl border border-border bg-surface px-3 py-3 text-xs text-text"
+          onClick={(event) => event.stopPropagation()}
         >
-          <ArrowLeft size={14} /> Move left
-        </button>
-        <button
-          type="button"
-          onClick={() => onMove(task.id, "right")}
-          className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-text transition hover:border-text"
-        >
-          Move right <ArrowRight size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(task.id)}
-          className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-rose-400 transition hover:border-rose-400"
-        >
-          <Trash2 size={14} /> Delete
-        </button>
-      </div>
-      <button
-        type="button"
-        className="cursor-grab text-xs text-text-muted"
-        {...attributes}
-        {...listeners}
-      >
-        Drag card
-      </button>
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">Checklist</span>
+            <span className="text-text-muted">{task.checklist.length} items</span>
+          </div>
+          <div className="mt-2 space-y-2">
+            {task.checklist.map((item) => (
+              <label key={item.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  onChange={() => onChecklistToggle(task.id, item.id)}
+                />
+                <span className={item.done ? "line-through text-text-muted" : "text-text"}>
+                  {item.label}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <input
+              value={checklistDraft}
+              onChange={(event) => onChecklistDraftChange(task.id, event.target.value)}
+              placeholder="Add checklist item"
+              className="flex-1 rounded-lg border border-border bg-bg px-2 py-1 text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => onChecklistAdd(task.id)}
+              className="rounded-lg border border-border px-2 py-1 text-xs"
+            >
+              Add
+            </button>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold">Progress</span>
+              <span className="text-text-muted">{task.progress}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={task.progress}
+              onChange={(event) => onProgressChange(task.id, Number(event.target.value))}
+              className="mt-2 w-full"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="text-xs font-semibold">Due date</label>
+            <input
+              type="date"
+              value={task.deadline}
+              onChange={(event) => onDeadlineChange(task.id, event.target.value)}
+              className="mt-2 w-full rounded-lg border border-border bg-bg px-2 py-1 text-xs"
+            />
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -312,7 +400,6 @@ function ColumnCard({
   isEditing,
   onEditStart,
   onEditSave,
-  onDelete,
   onAddTask,
   children,
 }: {
@@ -320,7 +407,6 @@ function ColumnCard({
   isEditing: boolean;
   onEditStart: () => void;
   onEditSave: (value: string) => void;
-  onDelete: () => void;
   onAddTask: () => void;
   children: ReactNode;
 }) {
@@ -341,6 +427,8 @@ function ColumnCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    resize: "horizontal" as const,
+    overflow: "auto" as const,
   };
 
   return (
@@ -350,9 +438,11 @@ function ColumnCard({
         setDroppableRef(node);
       }}
       style={style}
-      className={`flex flex-col gap-4 rounded-3xl border border-border bg-surface p-5 transition-shadow ${
+      className={`flex min-h-[220px] flex-col gap-4 rounded-3xl border border-border bg-surface p-5 transition-shadow ${
         isDragging ? "opacity-60 shadow-xl" : "hover:shadow-md"
       }`}
+      {...attributes}
+      {...listeners}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -367,12 +457,16 @@ function ColumnCard({
                   onEditSave((event.target as HTMLInputElement).value);
                 }
               }}
-              className="w-32 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
+              onClick={(event) => event.stopPropagation()}
+              className="w-36 rounded-lg border border-border bg-bg px-2 py-1 text-sm text-text"
             />
           ) : (
             <button
               type="button"
-              onClick={onEditStart}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEditStart();
+              }}
               className="text-left text-lg font-semibold text-text"
             >
               {column.title}
@@ -386,35 +480,13 @@ function ColumnCard({
       <div className="flex flex-wrap gap-2 text-xs text-text-muted">
         <button
           type="button"
-          onClick={onAddTask}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddTask();
+          }}
           className="rounded-full border border-border px-3 py-1 transition hover:border-text"
         >
           + Add task
-        </button>
-        <button
-          type="button"
-          onClick={onEditStart}
-          className="rounded-full border border-border px-3 py-1 transition hover:border-text"
-        >
-          Rename
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-full border border-border px-3 py-1 text-rose-400 transition hover:border-rose-400"
-        >
-          Delete column
-        </button>
-      </div>
-      <div className="flex items-center justify-between text-xs text-text-muted">
-        <span>Drag handle</span>
-        <button
-          type="button"
-          className="cursor-grab rounded-full border border-border px-3 py-1"
-          {...attributes}
-          {...listeners}
-        >
-          Drag column
         </button>
       </div>
       {children}
@@ -422,18 +494,20 @@ function ColumnCard({
   );
 }
 
-function TrashZone() {
+function TrashZone({ active }: { active: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: "trash" });
+  if (!active) return null;
+
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-sm font-medium transition ${
+      className={`fixed right-6 top-1/2 z-50 flex -translate-y-1/2 items-center gap-2 rounded-2xl border border-dashed px-4 py-4 text-sm font-medium transition ${
         isOver
           ? "border-rose-400 bg-rose-500/10 text-rose-400"
-          : "border-border text-text-muted"
+          : "border-border bg-bg text-text-muted"
       }`}
     >
-      <Trash2 size={18} /> Drop here to delete
+      <Trash2 size={18} /> Drop to delete
     </div>
   );
 }
@@ -450,6 +524,9 @@ export default function KanbanBoard() {
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [boardTitle, setBoardTitle] = useState("Product Launch Kanban");
   const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [checklistDrafts, setChecklistDrafts] = useState<Record<string, string>>({});
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -461,35 +538,6 @@ export default function KanbanBoard() {
     [columns]
   );
 
-  function handleMove(taskId: string, direction: "left" | "right") {
-    setColumns((prev) => {
-      const sourceIndex = prev.findIndex((column) =>
-        column.tasks.some((task) => task.id === taskId)
-      );
-      if (sourceIndex === -1) return prev;
-      const targetIndex = direction === "left" ? sourceIndex - 1 : sourceIndex + 1;
-      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
-      const task = prev[sourceIndex].tasks.find((item) => item.id === taskId);
-      if (!task) return prev;
-
-      return prev.map((column, index) => {
-        if (index === sourceIndex) {
-          return {
-            ...column,
-            tasks: column.tasks.filter((item) => item.id !== taskId),
-          };
-        }
-        if (index === targetIndex) {
-          return {
-            ...column,
-            tasks: [...column.tasks, task],
-          };
-        }
-        return column;
-      });
-    });
-  }
-
   function handleDeleteTask(taskId: string) {
     setColumns((prev) =>
       prev.map((column) => ({
@@ -497,6 +545,10 @@ export default function KanbanBoard() {
         tasks: column.tasks.filter((task) => task.id !== taskId),
       }))
     );
+  }
+
+  function handleDeleteColumn(columnIdToRemove: string) {
+    setColumns((prev) => prev.filter((column) => column.id !== columnIdToRemove));
   }
 
   function handleAddTask(event: FormEvent<HTMLFormElement>) {
@@ -510,6 +562,9 @@ export default function KanbanBoard() {
       tag,
       due,
       assignees: buildTaskAssignees(assignees),
+      checklist: [],
+      progress: 0,
+      deadline: "",
     };
 
     setColumns((prev) =>
@@ -536,6 +591,9 @@ export default function KanbanBoard() {
       tag: tagOptions[0],
       due: "This week",
       assignees: ["AR"],
+      checklist: [],
+      progress: 0,
+      deadline: "",
     };
 
     setColumns((prev) =>
@@ -558,10 +616,6 @@ export default function KanbanBoard() {
     setColumns((prev) => [...prev, newColumn]);
   }
 
-  function handleDeleteColumn(columnIdToRemove: string) {
-    setColumns((prev) => prev.filter((column) => column.id !== columnIdToRemove));
-  }
-
   function handleRenameColumn(columnIdToRename: string, titleValue: string) {
     const nextTitle = titleValue.trim() || "Untitled";
     setColumns((prev) =>
@@ -570,6 +624,49 @@ export default function KanbanBoard() {
       )
     );
     setEditingColumnId(null);
+  }
+
+  function updateTask(taskId: string, updater: (task: Task) => Task) {
+    setColumns((prev) =>
+      prev.map((column) => ({
+        ...column,
+        tasks: column.tasks.map((task) => (task.id === taskId ? updater(task) : task)),
+      }))
+    );
+  }
+
+  function handleChecklistToggle(taskId: string, itemId: string) {
+    updateTask(taskId, (task) => ({
+      ...task,
+      checklist: task.checklist.map((item) =>
+        item.id === itemId ? { ...item, done: !item.done } : item
+      ),
+    }));
+  }
+
+  function handleChecklistDraftChange(taskId: string, value: string) {
+    setChecklistDrafts((prev) => ({ ...prev, [taskId]: value }));
+  }
+
+  function handleChecklistAdd(taskId: string) {
+    const label = checklistDrafts[taskId]?.trim();
+    if (!label) return;
+    updateTask(taskId, (task) => ({
+      ...task,
+      checklist: [
+        ...task.checklist,
+        { id: `${taskId}-${crypto.randomUUID()}`, label, done: false },
+      ],
+    }));
+    setChecklistDrafts((prev) => ({ ...prev, [taskId]: "" }));
+  }
+
+  function handleProgressChange(taskId: string, value: number) {
+    updateTask(taskId, (task) => ({ ...task, progress: value }));
+  }
+
+  function handleDeadlineChange(taskId: string, value: string) {
+    updateTask(taskId, (task) => ({ ...task, deadline: value }));
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -681,10 +778,12 @@ export default function KanbanBoard() {
       });
     }
 
-    if (activeData?.type === "task") {
-      if (over.id === "trash") {
-        handleDeleteTask(activeData.taskId);
-      }
+    if (activeData?.type === "task" && over.id === "trash") {
+      handleDeleteTask(activeData.taskId);
+    }
+
+    if (activeData?.type === "column" && over.id === "trash") {
+      handleDeleteColumn(activeData.columnId);
     }
 
     setActiveDrag(null);
@@ -727,7 +826,7 @@ export default function KanbanBoard() {
               </button>
             )}
             <p className="mt-2 text-sm text-text-muted">
-              Drag columns, reorder cards, and drop tasks into the trash when they are done.
+              Drag cards between columns, resize panels, and drop items into the trash to delete.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -741,47 +840,34 @@ export default function KanbanBoard() {
             >
               <Plus size={16} /> New column
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-full border border-border px-3 py-2 text-sm text-text"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold">
+                  MJ
+                </span>
+                <ChevronDown size={16} />
+              </button>
+              {profileMenuOpen ? (
+                <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-border bg-bg p-3 text-xs text-text shadow-lg">
+                  <p className="font-semibold">Mina Johnson</p>
+                  <p className="text-text-muted">Level 12 • 8,450 XP</p>
+                  <div className="mt-3 rounded-xl bg-surface px-3 py-2">
+                    <p className="text-[10px] uppercase text-text-muted">Next level</p>
+                    <p className="text-sm font-semibold">1,550 XP to Level 13</p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
-        <div className="mt-6 grid gap-4 lg:grid-cols-[2fr_1.2fr]">
-          <div className="flex flex-wrap gap-3 text-xs text-text-muted">
-            <span className="rounded-full bg-surface-alt px-3 py-1">8 active members</span>
-            <span className="rounded-full bg-surface-alt px-3 py-1">Next sync: Thu, 10:00 AM</span>
-            <span className="rounded-full bg-surface-alt px-3 py-1">Sprint ends in 6 days</span>
-          </div>
-          <div className="rounded-2xl border border-border bg-bg/60 p-4">
-            <div className="flex items-center justify-between text-sm text-text">
-              <span className="font-semibold">Level 12</span>
-              <span className="text-text-muted">8,450 / 10,000 XP</span>
-            </div>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-alt">
-              <div className="h-full w-[82%] rounded-full bg-primary" />
-            </div>
-            <div className="mt-4 grid gap-2">
-              {badgeData.map((badge) => {
-                const Icon = badge.icon;
-                return (
-                  <div
-                    key={badge.title}
-                    className="flex items-center justify-between rounded-xl border border-border bg-surface px-3 py-2 text-xs text-text"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Icon size={16} />
-                      </span>
-                      <div>
-                        <p className="font-semibold">{badge.title}</p>
-                        <p className="text-text-muted">{badge.description}</p>
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-surface-alt px-2 py-1 text-[10px] text-text-muted">
-                      Earned
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        <div className="mt-6 flex flex-wrap gap-3 text-xs text-text-muted">
+          <span className="rounded-full bg-surface-alt px-3 py-1">8 active members</span>
+          <span className="rounded-full bg-surface-alt px-3 py-1">Next sync: Thu, 10:00 AM</span>
+          <span className="rounded-full bg-surface-alt px-3 py-1">Sprint ends in 6 days</span>
         </div>
       </section>
 
@@ -874,69 +960,80 @@ export default function KanbanBoard() {
         </form>
       </section>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        modifiers={[restrictToParentElement]}
+      <div
+        className="rounded-3xl border border-border bg-surface p-6"
+        style={{ resize: "both", overflow: "auto" }}
       >
-        <SortableContext items={columns.map((column) => column.id)}>
-          <section className="grid gap-6 lg:grid-cols-4">
-            {columns.map((column) => (
-              <ColumnCard
-                key={column.id}
-                column={column}
-                isEditing={editingColumnId === column.id}
-                onEditStart={() => setEditingColumnId(column.id)}
-                onEditSave={(value) => handleRenameColumn(column.id, value)}
-                onDelete={() => handleDeleteColumn(column.id)}
-                onAddTask={() => handleAddTaskToColumn(column.id)}
-              >
-                <SortableContext
-                  items={column.tasks.map((task) => task.id)}
-                  strategy={verticalListSortingStrategy}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToParentElement]}
+        >
+          <SortableContext items={columns.map((column) => column.id)}>
+            <section className="grid gap-6 lg:grid-cols-4">
+              {columns.map((column) => (
+                <ColumnCard
+                  key={column.id}
+                  column={column}
+                  isEditing={editingColumnId === column.id}
+                  onEditStart={() => setEditingColumnId(column.id)}
+                  onEditSave={(value) => handleRenameColumn(column.id, value)}
+                  onAddTask={() => handleAddTaskToColumn(column.id)}
                 >
-                  <div className="flex flex-col gap-4">
-                    {column.tasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        columnId={column.id}
-                        onMove={handleMove}
-                        onDelete={handleDeleteTask}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </ColumnCard>
-            ))}
-          </section>
-        </SortableContext>
+                  <SortableContext
+                    items={column.tasks.map((task) => task.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="flex flex-col gap-4">
+                      {column.tasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          columnId={column.id}
+                          isExpanded={expandedTaskId === task.id}
+                          checklistDraft={checklistDrafts[task.id] ?? ""}
+                          onToggleExpanded={() =>
+                            setExpandedTaskId((prev) => (prev === task.id ? null : task.id))
+                          }
+                          onChecklistToggle={handleChecklistToggle}
+                          onChecklistAdd={handleChecklistAdd}
+                          onChecklistDraftChange={handleChecklistDraftChange}
+                          onProgressChange={handleProgressChange}
+                          onDeadlineChange={handleDeadlineChange}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </ColumnCard>
+              ))}
+            </section>
+          </SortableContext>
 
-        <div className="mt-6">
-          <TrashZone />
-        </div>
+          <TrashZone active={Boolean(activeDrag)} />
 
-        <DragOverlay>
-          {activeTask ? (
-            <div className="w-72 rounded-2xl border border-border bg-bg p-4 shadow-xl">
-              <p className="text-sm font-semibold text-text">{activeTask.title}</p>
-              <p className="mt-2 text-sm text-text-muted">{activeTask.description}</p>
-            </div>
-          ) : null}
-          {activeColumn ? (
-            <div className="w-72 rounded-3xl border border-border bg-surface p-5 shadow-xl">
-              <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${activeColumn.accent}`} />
-                <p className="text-sm font-semibold text-text">{activeColumn.title}</p>
+          <DragOverlay>
+            {activeTask ? (
+              <div className="w-72 rounded-2xl border border-border bg-bg p-4 shadow-xl">
+                <p className="text-sm font-semibold text-text">{activeTask.title}</p>
+                <p className="mt-2 text-sm text-text-muted">{activeTask.description}</p>
               </div>
-              <p className="mt-2 text-xs text-text-muted">{activeColumn.tasks.length} tasks</p>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+            ) : null}
+            {activeColumn ? (
+              <div className="w-72 rounded-3xl border border-border bg-surface p-5 shadow-xl">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${activeColumn.accent}`} />
+                  <p className="text-sm font-semibold text-text">{activeColumn.title}</p>
+                </div>
+                <p className="mt-2 text-xs text-text-muted">{activeColumn.tasks.length} tasks</p>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
+
     </div>
   );
 }

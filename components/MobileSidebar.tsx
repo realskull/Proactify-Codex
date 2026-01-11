@@ -6,6 +6,7 @@ import {
   Trophy,
   Users,
   CheckSquare,
+  User,
   LogOut,
   Moon,
   Sun,
@@ -82,6 +83,7 @@ export default function MobileSidebar({ open, setOpen }: any) {
             <nav className="space-y-1">
               <SidebarLink href="/dashboard" icon={<BarChart3 size={18} />} label="Study Stats" />
               <SidebarLink href="/kanban" icon={<LayoutGrid size={18} />} label="Kanban Board" />
+              <SidebarLink href="/profile" icon={<User size={18} />} label="Profile" />
               <SidebarLink href="/leaderboards" icon={<Trophy size={18} />} label="Leaderboard" />
               <SidebarLink href="/rooms" icon={<Users size={18} />} label="Join Rooms" />
               <SidebarLink href="/todo" icon={<CheckSquare size={18} />} label="To-Do List" />
